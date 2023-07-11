@@ -11,6 +11,7 @@ public class NotificationTaskService {
     public NotificationTaskService(NotificationTaskRepository notificationTaskRepository) {
         this.notificationTaskRepository = notificationTaskRepository;
     }
+
     public void save(NotificationTask notificationTask) {
         notificationTaskRepository.save(notificationTask);
     }
