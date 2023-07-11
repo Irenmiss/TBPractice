@@ -1,7 +1,6 @@
 package com.example.coursework6bot.listener;
 
 import com.example.coursework6bot.entity.NotificationTask;
-import com.example.coursework6bot.repository.NotificationTaskRepository;
 import com.example.coursework6bot.service.NotificationTaskService;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
@@ -15,7 +14,6 @@ import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Component;
 
 import javax.annotation.PostConstruct;
-import javax.swing.text.DateFormatter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -27,7 +25,8 @@ import java.util.regex.Pattern;
 @Component
 public class TelegramBotUpdatesListener implements UpdatesListener {
     private final Logger logger = LoggerFactory.getLogger(TelegramBotUpdatesListener.class);
-    private final Pattern pattern = Pattern.compile("(\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{1,2})\\s+([А-я\\d\\s.,!?:A-z]+)");
+    private final Pattern pattern = Pattern.compile
+            ("(\\d{1,2}\\.\\d{1,2}\\.\\d{4} \\d{1,2}:\\d{2})\\s+([А-я\\d\\s.,!?:A-z]+)");
     private final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
 
     private final TelegramBot telegramBot;
@@ -41,48 +40,51 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
 
     @PostConstruct
     public void init() {
-
         telegramBot.setUpdatesListener(this);
     }
 
     @Override
     public int process(List<Update> updates) {
         try {
-            updates.forEach(update -> {
-                logger.info("Processing update: {}", update);
-                Message message = update.message();
-                Long chatId = message.chat().id();
-                String text = message.text();
-                if ("/start".equals(text)) {
-                    sendMessage(chatId, """
-                            Hi! 
-                            Let's schedule your task. 
-                            Please type the task using the next format: 01.01.2022 20:00 Task text
-                            """);
-                } else if (text != null) {
-                    Matcher matcher = pattern.matcher(text);
-                    if (matcher.find()) {
-                        LocalDateTime dateTime = parse(matcher.group(1));
-                        if (Objects.isNull(dateTime)) {
-                            sendMessage(chatId, "Invalid date or time format");
-                        } else {
-                            String txt = matcher.group(2);
-                            NotificationTask notificationTask = new NotificationTask();
-                            notificationTask.setChatId(chatId);
-                            notificationTask.setMessage(txt);
-                            notificationTask.setNotificationDateTime(dateTime);
-                            notificationTaskService.save(notificationTask);
+            updates.stream()
+                    .filter(update -> update.message() != null)
+                    .forEach(update -> {
+                        logger.info("Processing update: {}", update);
+                        Message message = update.message();
+                        Long chatId = message.chat().id();
+                        String text = message.text();
+                        if ("/start".equals(text)) {
+                            sendMessage(chatId, """
+                                    Hi! 
+                                    Let's schedule your task. 
+                                    Please type the task using the next format: 01.01.2022 20:00 Task text
+                                    """);
+                        } else if (text != null) {
+                            Matcher matcher = pattern.matcher(text);
+                            if (matcher.find()) {
+                                LocalDateTime dateTime = parse(matcher.group(1));
+                                if (Objects.isNull(dateTime)) {
+                                    sendMessage(chatId, "Invalid date or time format");
+                                } else {
+                                    String txt = matcher.group(2);
+                                    NotificationTask notificationTask = new NotificationTask();
+                                    notificationTask.setChatId(chatId);
+                                    notificationTask.setMessage(txt);
+                                    notificationTask.setNotificationDateTime(dateTime);
+                                    notificationTaskService.save(notificationTask);
+                                    sendMessage(chatId, "Task successfully scheduled");
+                                }
+                            } else {
+                                sendMessage(chatId, "Invalid task format");
+                            }
                         }
-                    } else {
-                        sendMessage(chatId, "Invalid task format");
-                    }
-                }
-            });
+                    });
         } catch (Exception e) {
             logger.error(e.getMessage(), e);
         }
         return UpdatesListener.CONFIRMED_UPDATES_ALL;
     }
+
     @Nullable
     private LocalDateTime parse(String dateTime) {
         try {
@@ -97,7 +99,6 @@ public class TelegramBotUpdatesListener implements UpdatesListener {
         SendResponse sendResponse = telegramBot.execute(sendMessage);
         if (!sendResponse.isOk()) {
             logger.error("Error during sending message: {}", sendResponse.description());
-
         }
     }
 }
